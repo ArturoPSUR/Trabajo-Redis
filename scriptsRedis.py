@@ -91,9 +91,9 @@ print(f"15. Filtro Precio > 200: {filtro_precio}")
 
 # 16 - Crear una lista en Redis (0.25 puntos)
 baseDatosRedis.rpush('tareas', 'revisar_inventario', 'comprar_papel', 'revisar_inventario', 'mantenimiento')
-print(
-    f"16. Elementos en lista 'tareas': {baseDatosRedis.lrange('tareas', 0, -1)}"
-)
+print(f"16. Elementos en lista 'tareas': {baseDatosRedis.lrange('tareas', 0, -1)}")
+
+#----------------------------------
 
 # 17 - Obtener elementos de una lista con un filtro en concreto (0.5 puntos)
 todas_las_tareas = baseDatosRedis.lrange('tareas', 0, -1)
