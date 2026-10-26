@@ -1,4 +1,5 @@
 import redis
+import json
 
 conexionRedis = redis.ConnectionPool(host='localhost', port=6379, db=0,decode_responses=True)
 baseDatosRedis = redis.Redis(connection_pool=conexionRedis)
@@ -56,14 +57,13 @@ print(f"10. Claves 'ordenador_?': {claves_interrogacion}")
 registros_filtrados = {k: baseDatosRedis.get(k) for k in baseDatosRedis.keys() if baseDatosRedis.get(k) == 'Lengua'}
 print(f"11. Registros filtrados 'Lengua': {registros_filtrados}")
 
-# 12 - Actualizar una serie de registros en base a un filtro (por ejemplo aumentar su valor en 1 )(0.5 puntos)
+# 12 - Actualizar una serie de registros en base a un filtro (por ejemplo aumentar su valor en 1)(0.5 puntos)
 for k in baseDatosRedis.keys('ordenador_*'):
     val_actual = int(baseDatosRedis.get(k))
     baseDatosRedis.set(k, str(val_actual + 1).zfill(3))
 print("12. Valores de ordenadores incrementados:",{k: baseDatosRedis.get(k) for k in baseDatosRedis.keys('ordenador_*')},)
 
 # 13 - Eliminar una serie de registros en base a un filtro (0.5 puntos)
-# Eliminar todos los ordenadores
 for k in baseDatosRedis.keys('ordenador_*'):
     baseDatosRedis.delete(k)
 print(f"13. Claves tras eliminar 'ordenador_*': {baseDatosRedis.keys()}")
@@ -75,15 +75,13 @@ datos_json = [
     {"id": 3, "nombre": "Silla Oficina", "categoria": "Mobiliario", "precio": 120},
 ]
 baseDatosRedis.set('inventario_json', json.dumps(datos_json))
-print("14. Estructura JSON almacenada en la clave 'inventario_json'")
 
 # 15 - Realizar un filtro por cada atributo de la estructura JSON anterior (0.5 puntos)
 inventario = json.loads(baseDatosRedis.get('inventario_json'))
+
 filtro_id = [item for item in inventario if item['id'] == 1]
 filtro_nombre = [item for item in inventario if 'HP' in item['nombre']]
-filtro_categoria = [
-    item for item in inventario if item['categoria'] == 'Informática'
-]
+filtro_categoria = [item for item in inventario if item['categoria'] == 'Informática']
 filtro_precio = [item for item in inventario if item['precio'] > 200]
 
 print(f"15. Filtro ID=1: {filtro_id}")
