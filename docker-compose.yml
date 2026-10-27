@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis/redis-stack:latest
+    container_name: mi_redis
+    ports:
+      - "6379:6379"
+      - "8001:8001"
+
+  mysql_db:
+    image: mysql:8.0
+    container_name: mi_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: colegio
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./init_sql:/docker-entrypoint-initdb.d

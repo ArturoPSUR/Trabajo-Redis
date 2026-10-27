@@ -1,5 +1,11 @@
 import redis
 import json
+from redis.commands.json.path import Path
+from redis.commands.search.field import TextField, NumericField, TagField
+from redis.commands.search.index_definition import IndexDefinition, IndexType
+from redis.commands.search.query import Query
+import redis.commands.search.aggregation as aggregations
+import redis.commands.search.reducers as reducers
 
 conexionRedis = redis.ConnectionPool(host='localhost', port=6379, db=0,decode_responses=True)
 baseDatosRedis = redis.Redis(connection_pool=conexionRedis)
@@ -69,31 +75,25 @@ for k in baseDatosRedis.keys('ordenador_*'):
 print(f"13. Claves tras eliminar 'ordenador_*': {baseDatosRedis.keys()}")
 
 # 14 - Crear una estructura en JSON de array de los datos que vayáis a almacenar (0.5 puntos)
-datos_json = [
-    {"id": 1, "nombre": "Portátil Asus", "categoria": "Informática", "precio": 700},
-    {"id": 2, "nombre": "Impresora HP", "categoria": "Informática", "precio": 150},
-    {"id": 3, "nombre": "Silla Oficina", "categoria": "Mobiliario", "precio": 120},
-]
-baseDatosRedis.set('inventario_json', json.dumps(datos_json))
+baseDatosRedis.json().set("productos_array", "$", [])
+baseDatosRedis.json().arrappend("productos_array", "$", {"id": 1, "nombre": "Portatil Asus", "categoria": "Informatica", "precio": 700})
+baseDatosRedis.json().arrappend("productos_array", "$", {"id": 2, "nombre": "Impresora HP", "categoria": "Informatica", "precio": 150})
+baseDatosRedis.json().arrappend("productos_array", "$", {"id": 3, "nombre": "Silla Oficina", "categoria": "Mobiliario", "precio": 120})
 
 # 15 - Realizar un filtro por cada atributo de la estructura JSON anterior (0.5 puntos)
-inventario = json.loads(baseDatosRedis.get('inventario_json'))
+res_id = baseDatosRedis.json().get("productos_array", "$[?(@.id==1)]")
+res_nombre = baseDatosRedis.json().get("productos_array", "$[?(@.nombre=='Impresora HP')]")
+res_cat = baseDatosRedis.json().get("productos_array", "$[?(@.categoria=='Informatica')]")
+res_precio = baseDatosRedis.json().get("productos_array", "$[?(@.precio>200)]")
 
-filtro_id = [item for item in inventario if item['id'] == 1]
-filtro_nombre = [item for item in inventario if 'HP' in item['nombre']]
-filtro_categoria = [item for item in inventario if item['categoria'] == 'Informática']
-filtro_precio = [item for item in inventario if item['precio'] > 200]
-
-print(f"15. Filtro ID=1: {filtro_id}")
-print(f"15. Filtro Nombre='HP': {filtro_nombre}")
-print(f"15. Filtro Categoria='Informática': {filtro_categoria}")
-print(f"15. Filtro Precio > 200: {filtro_precio}")
+print(f"15. Filtro JSON ID=1: {res_id}")
+print(f"15. Filtro JSON Nombre='Impresora HP': {res_nombre}")
+print(f"15. Filtro JSON Categoria='Informatica': {res_cat}")
+print(f"15. Filtro JSON Precio>200: {res_precio}")
 
 # 16 - Crear una lista en Redis (0.25 puntos)
 baseDatosRedis.rpush('tareas', 'revisar_inventario', 'comprar_papel', 'revisar_inventario', 'mantenimiento')
 print(f"16. Elementos en lista 'tareas': {baseDatosRedis.lrange('tareas', 0, -1)}")
-
-#----------------------------------
 
 # 17 - Obtener elementos de una lista con un filtro en concreto (0.5 puntos)
 todas_las_tareas = baseDatosRedis.lrange('tareas', 0, -1)
@@ -101,58 +101,36 @@ tareas_filtradas = [t for t in todas_las_tareas if 'revisar' in t]
 print(f"17. Tareas filtradas con patrón 'revisar': {tareas_filtradas}")
 
 # 18 - Crea datos con índices, definiendo un esquema de al menos tres campos (0.5 puntos)
-# Mediante Hashes y Sets auxiliares (índices invertidos)
-dispositivos = [
-    {
-        'id': 'disp:1',
-        'marca': 'Dell',
-        'tipo': 'Sobremesa',
-        'aula': '101',
-        'estado': 'Activo',
-    },
-    {
-        'id': 'disp:2',
-        'marca': 'HP',
-        'tipo': 'Portátil',
-        'aula': '101',
-        'estado': 'Inactivo',
-    },
-    {
-        'id': 'disp:3',
-        'marca': 'Dell',
-        'tipo': 'Portátil',
-        'aula': '102',
-        'estado': 'Activo',
-    },
-]
+esquema = (
+    TextField("$.nombre", as_name="nombre"),
+    TagField("$.ciudad", as_name="ciudad"),
+    NumericField("$.edad", as_name="edad")
+)
 
-for d in dispositivos:
-    # Guardar entidad en Hash
-    baseDatosRedis.hset(d['id'], mapping=d)
-    # Crear índices
-    baseDatosRedis.sadd(f"idx:marca:{d['marca']}", d['id'])
-    baseDatosRedis.sadd(f"idx:aula:{d['aula']}", d['id'])
-    baseDatosRedis.sadd(f"idx:estado:{d['estado']}", d['id'])
+# Creación del índice.
+try:
+    baseDatosRedis.ft("indice:usuarios").create_index(
+        esquema,
+        definition=IndexDefinition(prefix=["usuarios:"], index_type=IndexType.JSON)
+    )
+except Exception:
+    pass
 
-print("18. Datos y sus índices creados correctamente.")
+# Inserción usuarios formato JSON
+u1 = {"nombre": "Jorge Baron", "email": "jorge.baron@example.com", "edad": 38, "ciudad": "Spain"}
+u2 = {"nombre": "Elena Gomez", "email": "elena.gomez@example.com", "edad": 29, "ciudad": "Mexico"}
+u3 = {"nombre": "Pepe Garcia", "email": "pepe.garcia@example.com", "edad": 33, "ciudad": "Spain"}
+baseDatosRedis.json().set("usuarios:1", Path.root_path(), u1)
+baseDatosRedis.json().set("usuarios:2", Path.root_path(), u2)
+baseDatosRedis.json().set("usuarios:3", Path.root_path(), u3)
 
 # 19 - Realiza una búsqueda con índices en base a un campo (0.5 puntos)
-# Buscar todos los dispositivos de la marca 'Dell'
-ids_dell = baseDatosRedis.smembers('idx:marca:Dell')
-resultados_dell = [baseDatosRedis.hgetall(doc_id) for doc_id in ids_dell]
-print(f"19. Búsqueda por índice (Marca = Dell): {resultados_dell}")
+resultados = baseDatosRedis.ft("indice:usuarios").search(Query("@ciudad:{Spain} @edad:[30 40]"))
+print(f"19. Resultados búsqueda por índice: {resultados.docs}")
 
 # 20 - Realiza un group by usando los índices (0.5 puntos)
-# Agrupar los dispositivos por su 'aula'
-aulas = ['101', '102']
-group_by_aula = {}
-
-for aula in aulas:
-    ids_en_aula = baseDatosRedis.smembers(f"idx:aula:{aula}")
-    group_by_aula[aula] = [
-        baseDatosRedis.hgetall(doc_id) for doc_id in ids_en_aula
-    ]
-
-print(f"20. Group By por Campo 'aula': {group_by_aula}")
+groupby = aggregations.AggregateRequest("*").group_by('@ciudad', reducers.count().alias('count'))
+resultado_group = baseDatosRedis.ft("indice:usuarios").aggregate(groupby).rows
+print(f"20. Group By por ciudad: {resultado_group}")
 
 conexionRedis.close()
